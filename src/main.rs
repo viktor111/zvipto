@@ -24,7 +24,7 @@ use web3::{
 };
 
 struct App{
-    addresses: Vec<(Address, u64)>
+    addresses: Vec<(Address, u64, SecretKey)>
 }
 
 impl Default for App{
@@ -63,7 +63,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
     loop {
         terminal.draw(|f| ui(f,&app))?;
-        let provider = create_provider("https://goerli.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161").await;
+        let provider = create_provider("https://goerli.infura.io/v3/377a459d41794784a1e197028acf998c").await;
         if let Event::Key(key) = event::read()? {
             if let KeyCode::Char('q') = key.code {
                 return Ok(());
@@ -81,7 +81,7 @@ pub async fn create_provider(url: &str) -> Web3<Http>{
     return provider;
 }
 
-pub async fn updated_with_amount(provider: &Web3::<Http>, addresses: &mut Vec<(Address,u64)>){
+pub async fn updated_with_amount(provider: &Web3::<Http>, addresses: &mut Vec<(Address,u64, SecretKey)>){
     for el in addresses{
         let address = el.0;
         let balance = provider.eth().balance(address,None).await.unwrap();
@@ -105,13 +105,13 @@ fn generate_key_pair(seed: u64) -> (SecretKey, PublicKey){
     return result;
 }
 
-fn load_wallet() -> Vec<(Address, u64)>{
-    let mut result: Vec<(Address, u64)> = Vec::new();
+fn load_wallet() -> Vec<(Address, u64, SecretKey)>{
+    let mut result: Vec<(Address, u64, SecretKey)> = Vec::new();
     for i in 1..10{
         
         let keyPair = generate_key_pair(i);
         let address = public_key_address(&keyPair.1);
-        result.push((address, 0));
+        result.push((address, 0, keyPair.0));
     }
     return result;
 }
@@ -129,6 +129,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
         )
         .split(f.size());
 
+
     let block = Block::default().title("Block").borders(Borders::ALL);
     f.render_widget(block, chunks[0]);
     let block = Block::default().title("Block 2").borders(Borders::ALL);
@@ -137,8 +138,10 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
     .addresses
     .iter()
     .enumerate()
-    .map(|(i, (m, j))| {
-        let content = vec![Spans::from(Span::raw(format!("{}: {:#x} AMOUNT: {}", i, m, j)))];
+    .map(|(i, (m, j, s))| {
+        let pow_num: u64 = 10;
+        let content = vec![Spans::from(Span::raw(format!("{}: {:#x} AMOUNT: {} - {}", i, m, j, s.display_secret())))];
+
         ListItem::new(content)
     })
     .collect();
