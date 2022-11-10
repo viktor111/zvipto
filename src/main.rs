@@ -1,16 +1,4 @@
-use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
-use std::{error::Error, io};
-use tui::{
-    backend::{Backend, CrosstermBackend},
-    layout::{Constraint, Direction, Layout},
-    widgets::{Block, Borders, List, ListItem},
-    text::{Span, Spans},
-    Frame, Terminal,
-};
+use std::error::Error;
 use rand::{distributions::Alphanumeric, Rng};
 use secp256k1::{
     rand::{rngs, SeedableRng},
@@ -22,57 +10,9 @@ use web3::{
     transports::{WebSocket, Http},
     Web3,
 };
-
-struct App{
-    addresses: Vec<(Address, u64, SecretKey)>
-}
-
-impl Default for App{
-    fn default() -> App {
-        App{
-            addresses: load_wallet()
-        }
-    }
-}
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-    let app = App::default();
-    let res = run_app(&mut terminal, app).await;
-
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
-
-    if let Err(err) = res {
-        println!("{:?}", err)
-    }
-    
-
-    Ok(())
-}
-
-async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
-    loop {
-        terminal.draw(|f| ui(f,&app))?;
-        let provider = create_provider("https://goerli.infura.io/v3/377a459d41794784a1e197028acf998c").await;
-        if let Event::Key(key) = event::read()? {
-            if let KeyCode::Char('q') = key.code {
-                return Ok(());
-            }
-            if let KeyCode::Char('a') = key.code{
-                let addresses_with_amount = updated_with_amount(&provider, &mut app.addresses).await;
-            }
-        }
-    }
+    return Ok(());
 }
 
 pub async fn create_provider(url: &str) -> Web3<Http>{
@@ -109,43 +49,9 @@ fn load_wallet() -> Vec<(Address, u64, SecretKey)>{
     let mut result: Vec<(Address, u64, SecretKey)> = Vec::new();
     for i in 1..10{
         
-        let keyPair = generate_key_pair(i);
-        let address = public_key_address(&keyPair.1);
-        result.push((address, 0, keyPair.0));
+        let key_pair = generate_key_pair(i);
+        let address = public_key_address(&key_pair.1);
+        result.push((address, 0, key_pair.0));
     }
     return result;
-}
-
-fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
-    let chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints(
-            [
-                Constraint::Percentage(20),
-                Constraint::Percentage(3),
-                Constraint::Percentage(78)
-            ]
-            .as_ref(),
-        )
-        .split(f.size());
-
-
-    let block = Block::default().title("Block").borders(Borders::ALL);
-    f.render_widget(block, chunks[0]);
-    let block = Block::default().title("Block 2").borders(Borders::ALL);
-    f.render_widget(block, chunks[2]);
-    let items: Vec<ListItem>= app
-    .addresses
-    .iter()
-    .enumerate()
-    .map(|(i, (m, j, s))| {
-        let pow_num: u64 = 10;
-        let content = vec![Spans::from(Span::raw(format!("{}: {:#x} AMOUNT: {} - {}", i, m, j, s.display_secret())))];
-
-        ListItem::new(content)
-    })
-    .collect();
-    let messages =
-        List::new(items).block(Block::default().borders(Borders::ALL).title("Addresses"));
-    f.render_widget(messages, chunks[2]);
 }
